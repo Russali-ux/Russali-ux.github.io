@@ -360,7 +360,7 @@
     <h1>DIGEMID Alert Analyzer</h1>
     <p>Extrae acciones requeridas de alertas sanitarias · Powered by Claude AI</p>
   </div>
-  <div class="status-pill">API activa</div>
+  <div class="status-pill">Web mode</div>
 </header>
 
 <div class="main">
@@ -368,6 +368,10 @@
   <!-- SIDEBAR -->
   <aside class="sidebar">
     <div class="sidebar-top">
+      <label>API Key de Anthropic</label>
+      <div class="fetch-row" style="margin-bottom:14px">
+        <input type="password" id="apiKeyInput" placeholder="sk-ant-..." style="font-size:11px">
+      </div>
       <label>Cargar alertas recientes</label>
       <div class="fetch-row">
         <input type="number" id="numPages" value="1" min="1" max="5" placeholder="Páginas">
@@ -406,11 +410,21 @@
    CONFIGURACIÓN
 ────────────────────────────────────────────── */
 const BASE   = 'https://www.digemid.minsa.gob.pe';
-const PROXY  = 'https://api.allorigins.win/raw?url=';
 const CLAUDE = 'https://api.anthropic.com/v1/messages';
+
+// Proxies CORS en orden de preferencia — se intenta el siguiente si el anterior falla
+const PROXIES = [
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+];
 
 let alertas = [];
 let activeIdx = null;
+
+function getApiKey() {
+  return document.getElementById('apiKeyInput')?.value?.trim() || '';
+}
 
 /* ──────────────────────────────────────────────
    FETCH + PARSE ALERTAS DESDE DIGEMID
@@ -448,9 +462,22 @@ async function fetchAlertas() {
 }
 
 async function fetchProxy(url) {
-  const r = await fetch(PROXY + encodeURIComponent(url));
-  if (!r.ok) throw new Error(`HTTP ${r.status} al cargar ${url}`);
-  return r.text();
+  let lastError;
+  for (const proxyFn of PROXIES) {
+    try {
+      const proxyUrl = proxyFn(url);
+      const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(12000) });
+      if (r.ok) {
+        const text = await r.text();
+        // codetabs a veces devuelve JSON de error
+        if (text.startsWith('{"error"') || text.length < 500) continue;
+        return text;
+      }
+    } catch(e) {
+      lastError = e;
+    }
+  }
+  throw new Error(`No se pudo conectar a DIGEMID (todos los proxies fallaron). Verifica tu conexión.`);
 }
 
 function parseAlertas(html) {
@@ -685,9 +712,17 @@ async function analizarConClaude(texto, titulo) {
     }]
   };
 
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error('Ingresa tu API key de Anthropic para analizar alertas.');
+
   const resp = await fetch(CLAUDE, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
     body: JSON.stringify(body)
   });
 
