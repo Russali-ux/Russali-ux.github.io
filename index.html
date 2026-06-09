@@ -245,7 +245,7 @@
     margin-bottom: 20px;
     position: relative; overflow: hidden;
   }
-  .action-card.inmediata { background: rgba(255,77,109,.07); border: 1px solid rgba(255,77,109,.3); }
+  .action-card.inmediata { background: rgba(77, 113, 255, 0.114); border: 1px solid rgba(255,77,109,.3); }
   .action-card.preventiva { background: rgba(255,179,71,.06); border: 1px solid rgba(255,179,71,.3); }
   .action-card.informativa { background: rgba(0,194,255,.05); border: 1px solid rgba(0,194,255,.2); }
   .action-card.loading { background: rgba(255,255,255,.02); border: 1px solid var(--border); }
@@ -338,6 +338,65 @@
     .sidebar { width: 100%; }
     .main { flex-direction: column; }
   }
+
+  /* ── GROQ KEY SECTION ── */
+  .groq-key-section {
+    background: rgba(249,115,22,.04);
+    border: 1px solid rgba(249,115,22,.22);
+    border-radius: 10px;
+    padding: 12px;
+    margin-top: 14px;
+  }
+  .groq-key-section .provider-title { color: #f97316; margin-bottom: 8px; }
+
+  /* ── Q&A PANEL ── */
+  .qa-section { margin-top: 28px; }
+  .qa-messages {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 12px; max-height: 360px; overflow-y: auto;
+    min-height: 4px;
+  }
+  .qa-messages::-webkit-scrollbar { width: 4px; }
+  .qa-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .qa-msg {
+    padding: 10px 14px; border-radius: 10px;
+    font-size: 13px; line-height: 1.65; max-width: 92%;
+    word-break: break-word;
+  }
+  .qa-user {
+    background: rgba(0,119,204,.08); border: 1px solid rgba(0,119,204,.2);
+    align-self: flex-end; color: var(--text);
+  }
+  .qa-bot {
+    background: rgba(249,115,22,.07); border: 1px solid rgba(249,115,22,.2);
+    align-self: flex-start; color: var(--text);
+  }
+  .qa-thinking {
+    font-family: var(--mono); font-size: 11px; color: rgba(249,115,22,.85);
+    display: flex; align-items: center; gap: 6px;
+    padding: 8px 14px; border-radius: 10px;
+    background: rgba(249,115,22,.05); border: 1px solid rgba(249,115,22,.15);
+    align-self: flex-start;
+  }
+  .qa-input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .qa-textarea {
+    flex: 1; background: rgba(255,255,255,.05);
+    border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: var(--sans); font-size: 13px;
+    padding: 10px 12px; outline: none; resize: none;
+    min-height: 46px; max-height: 120px; overflow-y: auto;
+  }
+  .qa-textarea:focus { border-color: rgba(249,115,22,.5); }
+  .qa-textarea::placeholder { color: var(--muted); font-size: 12px; }
+  .btn-ask {
+    background: rgba(249,115,22,.12); color: #f97316;
+    border: 1px solid rgba(249,115,22,.4); border-radius: 8px;
+    padding: 0 18px; font-family: var(--mono); font-size: 11px;
+    font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: all .2s; flex-shrink: 0; height: 46px;
+  }
+  .btn-ask:hover { background: rgba(249,115,22,.22); }
+  .btn-ask:disabled { opacity: .4; cursor: not-allowed; }
 
   /* ── TOGGLE VISTA ── */
   .view-toggle {
@@ -463,10 +522,16 @@
           <input type="text" id="orModelInput" class="api-input" placeholder="Modelo OpenRouter (ej: openai/gpt-4o, google/gemini-flash)" autocomplete="off">
         </div>
       </div>
-      
-      <label>Cargar alertas recientes</label>
+
+      <!-- Groq API Key para Q&A -->
+      <div class="groq-key-section">
+        <div class="provider-title">⚡ Groq · Consultas en detalle</div>
+        <input type="password" id="groqKeyInput" class="api-input" placeholder="gsk_... (API Key de console.groq.com)" autocomplete="off">
+      </div>
+
+      <label style="margin-top:14px;display:block">Alertas a mostrar</label>
       <div class="fetch-row">
-        <input type="number" id="numPages" value="1" min="1" max="5" placeholder="Páginas">
+        <input type="number" id="numPages" value="10" min="1" max="50" placeholder="Nº alertas">
         <button class="btn-fetch" id="btnFetch" onclick="fetchAlertas()">Cargar</button>
       </div>
       <div id="fetchError" class="error-msg" style="display:none"></div>
@@ -613,6 +678,23 @@ const API_CONFIG = {
       };
     },
     extractText: (data) => data.choices?.[0]?.message?.content || '{}'
+  },
+  groq: {
+    url: 'https://api.groq.com/openai/v1/chat/completions',
+    model: 'llama-3.3-70b-versatile',
+    headers: (apiKey) => ({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    }),
+    buildBody: (prompt, systemPrompt) => ({
+      model: 'llama-3.3-70b-versatile',
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt }
+      ]
+    }),
+    extractText: (data) => data.choices?.[0]?.message?.content || '{}'
   }
 };
 
@@ -654,9 +736,9 @@ function getApiKey() {
    FETCH + PARSE ALERTAS
 ────────────────────────────────────────────── */
 async function fetchAlertas() {
-  const btn     = document.getElementById('btnFetch');
-  const errDiv  = document.getElementById('fetchError');
-  const nPages  = parseInt(document.getElementById('numPages').value) || 1;
+  const btn        = document.getElementById('btnFetch');
+  const errDiv     = document.getElementById('fetchError');
+  const numResults = Math.max(1, parseInt(document.getElementById('numPages').value) || 10);
   errDiv.style.display = 'none';
   btn.disabled = true; btn.textContent = '...';
 
@@ -664,15 +746,17 @@ async function fetchAlertas() {
   renderList([]);
 
   try {
-    for (let p = 1; p <= nPages; p++) {
+    const MAX_PAGES = 10;
+    for (let p = 1; p <= MAX_PAGES && alertas.length < numResults; p++) {
       const url = p === 1
         ? `${BASE}/alertas`
         : `${BASE}/webDigemid/alertas/page/${p}/`;
       const html = await fetchProxy(url);
       const parsed = parseAlertas(html);
       alertas.push(...parsed);
-      renderList(alertas, true);
+      renderList(alertas.slice(0, numResults), true);
     }
+    alertas = alertas.slice(0, numResults);
     if (alertas.length === 0) throw new Error('No se encontraron alertas.');
     document.getElementById('viewToggle').style.display = 'flex';
     updateStats();
@@ -886,13 +970,15 @@ async function selectAlerta(idx) {
 
     alertas[idx] = {
       ...a,
-      status:   'done',
-      accion:   resultado.accion_principal,
-      urgencia: resultado.urgencia,
-      dirigido: resultado.dirigido_a || [],
-      acciones: resultado.acciones_detalladas || [],
-      resumen:  resultado.resumen_accion || '',
-      pdfUrl:   pdfUrl,
+      status:        'done',
+      accion:        resultado.accion_principal,
+      urgencia:      resultado.urgencia,
+      dirigido:      resultado.dirigido_a || [],
+      acciones:      resultado.acciones_detalladas || [],
+      resumen:       resultado.resumen_accion || '',
+      pdfUrl:        pdfUrl,
+      textoCompleto: textoAlerta,
+      qaHistory:     a.qaHistory || [],
     };
   } catch(e) {
     alertas[idx].status   = 'error';
@@ -1014,9 +1100,115 @@ function renderDetail(a) {
     </div>
 
     <div style="margin-top:20px;font-size:10px;color:var(--muted);font-family:var(--mono)">
-      Análisis generado por ${getProviderName()} · 
+      Análisis generado por ${getProviderName()} ·
       <a href="${a.url}" target="_blank" style="color:var(--accent);text-decoration:none">Ver alerta oficial →</a>
+    </div>
+
+    <div class="section qa-section">
+      <div class="section-title">⚡ Consultar con Groq · lectura del documento</div>
+      <div class="qa-messages" id="qaMessages">
+        ${(a.qaHistory||[]).map(h => `
+          <div class="qa-msg qa-user">${h.q}</div>
+          <div class="qa-msg qa-bot">${h.a.replace(/\n/g,'<br>')}</div>
+        `).join('')}
+      </div>
+      <div class="qa-input-row">
+        <textarea id="qaInput" class="qa-textarea"
+          placeholder="Ej: ¿Qué productos debo retirar? ¿A quién notificar? ¿Cuál es el lote afectado?"
+          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();askQuestion(${activeIdx})}"></textarea>
+        <button id="btnAsk" class="btn-ask" onclick="askQuestion(${activeIdx})">Preguntar</button>
+      </div>
+      <div id="qaError" class="error-msg" style="display:none"></div>
     </div>`;
+}
+
+/* ──────────────────────────────────────────────
+   GROQ Q&A — CONSULTAS SOBRE LA ALERTA
+────────────────────────────────────────────── */
+async function askQuestion(idx) {
+  const groqKey = document.getElementById('groqKeyInput')?.value?.trim();
+  const errDiv  = document.getElementById('qaError');
+  const input   = document.getElementById('qaInput');
+  const btn     = document.getElementById('btnAsk');
+
+  if (!groqKey) {
+    errDiv.textContent = '⚠ Ingresa tu API key de Groq (console.groq.com) para hacer preguntas.';
+    errDiv.style.display = 'block';
+    return;
+  }
+  const question = input?.value?.trim();
+  if (!question) return;
+
+  const a = alertas[idx];
+  if (!a.qaHistory) a.qaHistory = [];
+
+  const context = a.textoCompleto && a.textoCompleto.length > 80
+    ? a.textoCompleto
+    : `Alerta: ${a.titulo}\nProducto: ${a.producto}\nTipo: ${a.tipo}\nAcción principal: ${a.accion || '—'}\nResumen: ${a.resumen || '—'}\nAcciones: ${(a.acciones||[]).join('; ')}\nDirigido a: ${(a.dirigido||[]).join(', ')}`;
+
+  if (btn) { btn.disabled = true; btn.textContent = '...'; }
+  input.value = '';
+  errDiv.style.display = 'none';
+
+  const messagesDiv = document.getElementById('qaMessages');
+
+  const userDiv = document.createElement('div');
+  userDiv.className = 'qa-msg qa-user';
+  userDiv.textContent = question;
+  messagesDiv.appendChild(userDiv);
+
+  const thinkingDiv = document.createElement('div');
+  thinkingDiv.className = 'qa-thinking';
+  thinkingDiv.innerHTML = '<span class="spin">⟳</span> Groq está leyendo el documento...';
+  messagesDiv.appendChild(thinkingDiv);
+  messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+  try {
+    const systemPrompt = `Eres un asistente especializado en regulación farmacéutica peruana (DIGEMID). Responde preguntas sobre la siguiente Alerta DIGEMID basándote ÚNICAMENTE en el contenido del documento. Si la información no está en el documento, dilo claramente. Responde en español, de forma clara y concisa.\n\n--- CONTENIDO DE LA ALERTA ---\n${context.slice(0, 9000)}\n--- FIN DEL DOCUMENTO ---`;
+
+    const historyMessages = a.qaHistory.flatMap(h => [
+      { role: 'user',      content: h.q },
+      { role: 'assistant', content: h.a }
+    ]);
+
+    const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${groqKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...historyMessages,
+          { role: 'user', content: question }
+        ]
+      })
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `Groq error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const answer = data.choices?.[0]?.message?.content || 'Sin respuesta';
+
+    a.qaHistory.push({ q: question, a: answer });
+
+    thinkingDiv.className = 'qa-msg qa-bot';
+    thinkingDiv.innerHTML = answer.replace(/\n/g, '<br>');
+
+  } catch(e) {
+    thinkingDiv.remove();
+    errDiv.textContent = '⚠ ' + e.message;
+    errDiv.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Preguntar'; }
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
 }
 
 /* ──────────────────────────────────────────────
