@@ -110,8 +110,9 @@
   }
   .provider-buttons {
     display: flex;
-    gap: 8px;
+    gap: 6px;
     margin-bottom: 12px;
+    flex-wrap: wrap;
   }
   .provider-btn {
     flex: 1;
@@ -135,6 +136,7 @@
   .provider-btn.deepseek.active { background: #4c9aff; border-color: #4c9aff; color: #000; }
   .provider-btn.openai.active { background: #10a37f; border-color: #10a37f; color: #000; }
   .provider-btn.openrouter.active { background: #7c3aed; border-color: #7c3aed; color: #fff; }
+  .provider-btn.groq.active { background: #f97316; border-color: #f97316; color: #000; }
   .provider-btn:hover:not(.active) { border-color: var(--accent); color: var(--accent); }
   
   .api-input {
@@ -419,6 +421,38 @@
 
   /* ── TABLA ── */
   #tablePanel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+
+  .tbl-ai-bar {
+    padding: 8px 32px 10px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(249,115,22,.025);
+    flex-shrink: 0;
+  }
+  .tbl-ai-input-row { display: flex; gap: 8px; align-items: center; }
+  .tbl-ai-input { flex: 1; width: auto !important; }
+  .btn-tbl-ask {
+    background: rgba(249,115,22,.12); color: #f97316;
+    border: 1px solid rgba(249,115,22,.4); border-radius: 6px;
+    padding: 5px 14px; font-family: var(--mono); font-size: 10px;
+    font-weight: 700; cursor: pointer; white-space: nowrap;
+    transition: all .2s;
+  }
+  .btn-tbl-ask:hover { background: rgba(249,115,22,.22); }
+  .btn-tbl-ask:disabled { opacity: .4; cursor: not-allowed; }
+  .tbl-ai-result {
+    margin-top: 8px;
+    padding: 10px 14px;
+    background: rgba(249,115,22,.06);
+    border: 1px solid rgba(249,115,22,.2);
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text);
+    max-height: 180px;
+    overflow-y: auto;
+  }
+  .tbl-ai-result::-webkit-scrollbar { width: 4px; }
+  .tbl-ai-result::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   .tbl-toolbar {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 32px; border-bottom: 1px solid var(--border); flex-shrink: 0;
@@ -498,7 +532,7 @@
   <div class="logo-badge">DIG</div>
   <div>
     <h1>DIGEMID Alert Analyzer</h1>
-    <p>Extrae acciones requeridas de alertas sanitarias · Multi-IA (Claude · DeepSeek · ChatGPT)</p>
+    <p>Extrae acciones requeridas de alertas sanitarias · Multi-IA (Claude · DeepSeek · ChatGPT · Groq)</p>
   </div>
   <div class="status-pill">Multi-IA ready</div>
 </header>
@@ -516,10 +550,20 @@
           <button class="provider-btn deepseek" onclick="setProvider('deepseek')">DeepSeek</button>
           <button class="provider-btn openai" onclick="setProvider('openai')">ChatGPT</button>
           <button class="provider-btn openrouter" onclick="setProvider('openrouter')">OpenRouter</button>
+          <button class="provider-btn groq" onclick="setProvider('groq')">Groq</button>
         </div>
         <input type="password" id="apiKeyInput" class="api-input" placeholder="API Key (según proveedor seleccionado)" autocomplete="off">
         <div id="orModelRow" style="display:none;margin-top:8px">
           <input type="text" id="orModelInput" class="api-input" placeholder="Modelo OpenRouter (ej: openai/gpt-4o, google/gemini-flash)" autocomplete="off">
+        </div>
+        <div id="groqModelRow" style="display:none;margin-top:8px">
+          <select id="groqModelInput" class="api-input" style="cursor:pointer">
+            <option value="llama-3.3-70b-versatile">llama-3.3-70b-versatile (recomendado)</option>
+            <option value="llama-3.1-8b-instant">llama-3.1-8b-instant (rápido)</option>
+            <option value="mixtral-8x7b-32768">mixtral-8x7b-32768</option>
+            <option value="gemma2-9b-it">gemma2-9b-it</option>
+            <option value="llama3-70b-8192">llama3-70b-8192</option>
+          </select>
         </div>
       </div>
 
@@ -577,6 +621,18 @@
         </div>
         <button class="btn-export" onclick="exportarCSV()">↓ Exportar CSV</button>
       </div>
+      <!-- AI Query bar -->
+      <div class="tbl-ai-bar">
+        <div class="tbl-ai-input-row">
+          <input class="tbl-filter tbl-ai-input" id="tblAiInput"
+            placeholder="🤖 Pregunta sobre las alertas visibles (usa el modelo seleccionado)..."
+            onkeydown="if(event.key==='Enter')askTableAI()">
+          <button class="btn-tbl-ask" id="btnTblAsk" onclick="askTableAI()">Consultar IA</button>
+        </div>
+        <div id="tblAiResult" class="tbl-ai-result" style="display:none"></div>
+        <div id="tblAiError" class="error-msg" style="display:none;margin-top:6px"></div>
+      </div>
+
       <div class="tbl-scroll">
         <table class="alerts-table" id="alertsTable">
           <thead>
@@ -686,14 +742,17 @@ const API_CONFIG = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${apiKey}`
     }),
-    buildBody: (prompt, systemPrompt) => ({
-      model: 'llama-3.3-70b-versatile',
-      max_tokens: 1024,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: prompt }
-      ]
-    }),
+    buildBody: (prompt, systemPrompt) => {
+      const model = document.getElementById('groqModelInput')?.value?.trim() || 'llama-3.3-70b-versatile';
+      return {
+        model,
+        max_tokens: 1024,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: prompt }
+        ]
+      };
+    },
     extractText: (data) => data.choices?.[0]?.message?.content || '{}'
   }
 };
@@ -711,21 +770,24 @@ const PROXIES = [
 
 function setProvider(provider) {
   currentProvider = provider;
-  // Update UI
-  document.querySelectorAll('.provider-btn').forEach(btn => {
-    btn.classList.remove('active');
-  });
+  document.querySelectorAll('.provider-btn').forEach(btn => btn.classList.remove('active'));
   document.querySelector(`.provider-btn.${provider}`).classList.add('active');
-  
-  // Update placeholder según proveedor
+
   const placeholders = {
     anthropic:   'sk-ant-api... (API Key de Anthropic)',
     deepseek:    'sk-... (API Key de DeepSeek)',
     openai:      'sk-proj-... (API Key de OpenAI)',
-    openrouter:  'sk-or-v1-... (API Key de OpenRouter)'
+    openrouter:  'sk-or-v1-... (API Key de OpenRouter)',
+    groq:        'gsk_... (API Key de console.groq.com)'
   };
   document.getElementById('apiKeyInput').placeholder = placeholders[provider] || 'API Key';
-  document.getElementById('orModelRow').style.display = provider === 'openrouter' ? 'block' : 'none';
+  document.getElementById('orModelRow').style.display   = provider === 'openrouter' ? 'block' : 'none';
+  document.getElementById('groqModelRow').style.display = provider === 'groq'       ? 'block' : 'none';
+
+  // Cuando Groq es el proveedor principal, ocultar la sección Q&A separada
+  // (el mismo apiKeyInput se usará para las consultas de detalle)
+  const groqSection = document.querySelector('.groq-key-section');
+  if (groqSection) groqSection.style.display = provider === 'groq' ? 'none' : 'block';
 }
 
 function getApiKey() {
@@ -910,7 +972,7 @@ async function analizarConIA(texto, titulo) {
 }
 
 function getProviderName() {
-  const names = { anthropic: 'Claude', deepseek: 'DeepSeek', openai: 'ChatGPT', openrouter: 'OpenRouter' };
+  const names = { anthropic: 'Claude', deepseek: 'DeepSeek', openai: 'ChatGPT', openrouter: 'OpenRouter', groq: 'Groq' };
   return names[currentProvider] || currentProvider;
 }
 
@@ -1126,13 +1188,19 @@ function renderDetail(a) {
    GROQ Q&A — CONSULTAS SOBRE LA ALERTA
 ────────────────────────────────────────────── */
 async function askQuestion(idx) {
-  const groqKey = document.getElementById('groqKeyInput')?.value?.trim();
+  // Si Groq es el proveedor principal, reusar su API key; de lo contrario, usar la clave dedicada de Q&A
+  const groqKey = currentProvider === 'groq'
+    ? (document.getElementById('apiKeyInput')?.value?.trim())
+    : (document.getElementById('groqKeyInput')?.value?.trim());
   const errDiv  = document.getElementById('qaError');
   const input   = document.getElementById('qaInput');
   const btn     = document.getElementById('btnAsk');
 
   if (!groqKey) {
-    errDiv.textContent = '⚠ Ingresa tu API key de Groq (console.groq.com) para hacer preguntas.';
+    const hint = currentProvider === 'groq'
+      ? '⚠ Ingresa tu API key de Groq en el campo superior.'
+      : '⚠ Ingresa tu API key de Groq (console.groq.com) para hacer preguntas.';
+    errDiv.textContent = hint;
     errDiv.style.display = 'block';
     return;
   }
@@ -1208,6 +1276,80 @@ async function askQuestion(idx) {
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Preguntar'; }
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+}
+
+/* ──────────────────────────────────────────────
+   CONSULTA IA SOBRE LA TABLA
+────────────────────────────────────────────── */
+async function askTableAI() {
+  const apiKey   = getApiKey();
+  const question = document.getElementById('tblAiInput')?.value?.trim();
+  const resultDiv = document.getElementById('tblAiResult');
+  const errDiv   = document.getElementById('tblAiError');
+  const btn      = document.getElementById('btnTblAsk');
+
+  errDiv.style.display = 'none';
+
+  if (!apiKey) {
+    errDiv.textContent = `⚠ Ingresa tu API key de ${getProviderName()} para hacer consultas.`;
+    errDiv.style.display = 'block';
+    return;
+  }
+  if (!question) return;
+  if (alertas.length === 0) {
+    errDiv.textContent = '⚠ Primero carga las alertas.';
+    errDiv.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '...';
+  resultDiv.style.display = 'block';
+  resultDiv.innerHTML = `<span class="spin">⟳</span> Consultando con ${getProviderName()}...`;
+
+  // Usar alertas visibles (filtradas) o todas si no hay filtro activo
+  const indices = filteredRows.length > 0 ? filteredRows : alertas.map((_,i) => i);
+  const visible = indices.slice(0, 60).map(i => alertas[i]);
+
+  const lista = visible.map((a, n) => {
+    const parts = [`${n+1}. ${a.titulo}`];
+    if (a.producto) parts.push(`Producto: ${a.producto}`);
+    if (a.tipo)     parts.push(`Tipo: ${a.tipo}`);
+    if (a.fecha)    parts.push(`Fecha: ${a.fecha}`);
+    if (a.urgencia) parts.push(`Urgencia: ${a.urgencia}`);
+    if (a.accion)   parts.push(`Acción: ${a.accion}`);
+    return parts.join(' | ');
+  }).join('\n');
+
+  const systemPrompt = `Eres un experto en regulación farmacéutica peruana (DIGEMID). Responde preguntas sobre la siguiente lista de Alertas DIGEMID. Sé claro y conciso. Responde en español.`;
+  const prompt = `Lista de ${visible.length} alertas DIGEMID:\n\n${lista}\n\nPregunta: ${question}`;
+
+  try {
+    const config = API_CONFIG[currentProvider];
+    if (!config) throw new Error(`Proveedor ${currentProvider} no configurado.`);
+
+    const resp = await fetch(config.url, {
+      method: 'POST',
+      headers: config.headers(apiKey),
+      body: JSON.stringify(config.buildBody(prompt, systemPrompt))
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `API error ${resp.status}`);
+    }
+
+    const data   = await resp.json();
+    const answer = config.extractText(data);
+    resultDiv.innerHTML = answer.replace(/\n/g, '<br>');
+  } catch(e) {
+    resultDiv.style.display = 'none';
+    errDiv.textContent = '⚠ ' + e.message;
+    errDiv.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Consultar IA';
   }
 }
 
