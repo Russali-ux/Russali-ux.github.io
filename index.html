@@ -7,18 +7,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Sora:wght@300;400;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg:       #0b0f1a;
-    --surface:  #111827;
-    --border:   #1e2d45;
-    --accent:   #00c2ff;
-    --danger:   #ff4d6d;
-    --warn:     #ffb347;
-    --safe:     #38f9a4;
-    --muted:    #4a5a72;
-    --text:     #e2eaf5;
-    --subtext:  #7a8fa8;
-    --mono:     'Space Mono', monospace;
-    --sans:     'Sora', sans-serif;
+    --bg:       #ffffff;
+    --surface:  #f5f7fa;
+    --border:   #d0d7e3;
+    --accent:   #0077cc;
+    --danger:   #e00030;
+    --warn:     #cc8800;
+    --safe:     #00996a;
+    --muted:    #8a9ab8;
+    --text:     #1a2030;
+    --subtext:  #5a6a82;
+    --mono:     Arial, sans-serif;
+    --sans:     Arial, sans-serif;
   }
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -34,10 +34,6 @@
   body::before {
     content: '';
     position: fixed; inset: 0;
-    background-image:
-      linear-gradient(rgba(0,194,255,.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0,194,255,.04) 1px, transparent 1px);
-    background-size: 40px 40px;
     pointer-events: none;
     z-index: 0;
   }
@@ -341,6 +337,99 @@
     .sidebar { width: 100%; }
     .main { flex-direction: column; }
   }
+
+  /* ── TOGGLE VISTA ── */
+  .view-toggle {
+    display: none; gap: 6px;
+    padding: 0 32px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+  .view-btn {
+    background: transparent;
+    border: none; border-bottom: 2px solid transparent;
+    padding: 10px 18px;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    color: var(--subtext); cursor: pointer;
+    transition: all .2s; letter-spacing: .5px;
+  }
+  .view-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .view-btn:hover:not(.active) { color: var(--text); }
+
+  /* ── TABLA ── */
+  #tablePanel { display: none; flex-direction: column; flex: 1; overflow: hidden; }
+  .tbl-toolbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 32px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+  }
+  .tbl-toolbar-left { display: flex; align-items: center; gap: 12px; }
+  .tbl-count { font-family: var(--mono); font-size: 11px; color: var(--subtext); }
+  .tbl-filter {
+    background: rgba(255,255,255,.04); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); font-family: var(--mono); font-size: 10px;
+    padding: 5px 10px; outline: none; width: 200px; transition: border-color .2s;
+  }
+  .tbl-filter:focus { border-color: var(--accent); }
+  .tbl-filter::placeholder { color: var(--muted); }
+  .btn-export {
+    background: rgba(56,249,164,.08); border: 1px solid rgba(56,249,164,.3);
+    color: var(--safe); border-radius: 6px; padding: 5px 14px;
+    font-family: var(--mono); font-size: 10px; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+  }
+  .btn-export:hover { background: rgba(56,249,164,.18); }
+
+  .tbl-scroll { overflow: auto; flex: 1; }
+  .tbl-scroll::-webkit-scrollbar { width: 5px; height: 5px; }
+  .tbl-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .alerts-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 860px; }
+  .alerts-table thead tr { position: sticky; top: 0; z-index: 2; }
+  .alerts-table th {
+    padding: 11px 14px; background: #eaf0f8;
+    border-bottom: 2px solid var(--border);
+    border-right: 1px solid rgba(30,45,69,.6);
+    font-family: var(--mono); font-size: 9px; font-weight: 700;
+    letter-spacing: 1.2px; text-transform: uppercase;
+    color: var(--subtext); text-align: left; white-space: nowrap;
+    user-select: none; cursor: pointer; transition: color .15s;
+  }
+  .alerts-table th:hover { color: var(--accent); }
+  .alerts-table th:last-child { border-right: none; }
+  .sort-icon { margin-left: 4px; font-size: 8px; opacity: .35; }
+  .sort-asc  .sort-icon { opacity: 1; color: var(--accent); }
+  .sort-asc  .sort-icon::after { content: ' ▲'; }
+  .sort-desc .sort-icon { opacity: 1; color: var(--accent); }
+  .sort-desc .sort-icon::after { content: ' ▼'; }
+  .sort-icon::after { content: ' ⬍'; }
+
+  .alerts-table td {
+    padding: 11px 14px; border-bottom: 1px solid rgba(30,45,69,.7);
+    border-right: 1px solid rgba(30,45,69,.4);
+    vertical-align: middle; line-height: 1.5; color: var(--text);
+  }
+  .alerts-table td:last-child { border-right: none; }
+  .alerts-table tbody tr:nth-child(even) td { background: rgba(255,255,255,.016); }
+  .alerts-table tbody tr:hover td { background: rgba(0,194,255,.05) !important; cursor: pointer; }
+  .alerts-table tbody tr.row-selected td { background: rgba(0,194,255,.09) !important; }
+  .alerts-table tbody tr.row-selected td:first-child { border-left: 3px solid var(--accent); }
+
+  .cell-num { font-family: var(--mono); font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; }
+  .tipo-badge {
+    display: inline-block; padding: 3px 8px; border-radius: 4px;
+    font-family: var(--mono); font-size: 9px; font-weight: 700; white-space: nowrap;
+  }
+  .tipo-falsificados { background: rgba(255,77,109,.12); color: #ff6b85; border: 1px solid rgba(255,77,109,.3); }
+  .tipo-calidad      { background: rgba(56,249,164,.09); color: #38f9a4; border: 1px solid rgba(56,249,164,.25); }
+  .tipo-seguridad    { background: rgba(255,179,71,.11); color: #ffb347; border: 1px solid rgba(255,179,71,.3); }
+  .tipo-general      { background: rgba(255,255,255,.05); color: var(--subtext); border: 1px solid var(--border); }
+  .cell-fecha, .cell-captura { font-family: var(--mono); font-size: 10px; color: var(--subtext); white-space: nowrap; }
+  .cell-url a {
+    color: var(--accent); text-decoration: none; font-size: 11px;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all;
+  }
+  .cell-url a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -392,13 +481,50 @@
     </div>
   </aside>
 
-  <section class="content" id="contentPanel">
-    <div class="empty-state">
-      <div class="empty-icon">🔍</div>
-      <h3>Selecciona una alerta</h3>
-      <p>Carga las alertas recientes y selecciona una para ver las acciones requeridas analizadas con IA.</p>
+  <div style="flex:1;display:flex;flex-direction:column;overflow:hidden;">
+
+    <!-- Toggle -->
+    <div class="view-toggle" id="viewToggle">
+      <button class="view-btn active" id="btnDetail" onclick="setView('detail')">⬡ Detalle</button>
+      <button class="view-btn" id="btnTable" onclick="setView('table')">⊞ Tabla</button>
     </div>
-  </section>
+
+    <!-- Vista detalle -->
+    <section class="content" id="contentPanel" style="flex:1;overflow-y:auto;">
+      <div class="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>Selecciona una alerta</h3>
+        <p>Carga las alertas recientes y selecciona una para ver las acciones requeridas analizadas con IA.</p>
+      </div>
+    </section>
+
+    <!-- Vista tabla -->
+    <div id="tablePanel">
+      <div class="tbl-toolbar">
+        <div class="tbl-toolbar-left">
+          <span class="tbl-count" id="tblCount">— alertas</span>
+          <input class="tbl-filter" id="tblSearch" placeholder="🔍 Filtrar alertas..." oninput="filterTable()">
+        </div>
+        <button class="btn-export" onclick="exportarCSV()">↓ Exportar CSV</button>
+      </div>
+      <div class="tbl-scroll">
+        <table class="alerts-table" id="alertsTable">
+          <thead>
+            <tr>
+              <th onclick="sortTable(0)">Título<span class="sort-icon"></span></th>
+              <th onclick="sortTable(1)">Producto<span class="sort-icon"></span></th>
+              <th onclick="sortTable(2)">Tipo de Alerta<span class="sort-icon"></span></th>
+              <th onclick="sortTable(3)">Fecha Publicación<span class="sort-icon"></span></th>
+              <th>URL Alerta</th>
+              <th onclick="sortTable(5)">Fecha Captura<span class="sort-icon"></span></th>
+            </tr>
+          </thead>
+          <tbody id="alertsTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 
 </div>
 
@@ -519,6 +645,7 @@ async function fetchAlertas() {
       renderList(alertas, true);
     }
     if (alertas.length === 0) throw new Error('No se encontraron alertas.');
+    document.getElementById('viewToggle').style.display = 'flex';
     updateStats();
     if (alertas.length > 0) selectAlerta(0);
   } catch(e) {
@@ -565,6 +692,7 @@ function parseAlertas(html) {
       producto: exc ? exc.textContent.trim() : '',
       fecha:    time ? time.getAttribute('datetime') : '',
       tipo:     cats[0] || 'General',
+      fecha_captura: new Date().toLocaleString('es-PE'),
       status:   'pending',
       accion:   null,
       urgencia: null,
@@ -746,6 +874,7 @@ async function selectAlerta(idx) {
 
   updateItem(idx);
   updateStats();
+  if (currentView === 'table') renderTable();
   if (activeIdx === idx) renderDetail(alertas[idx]);
 }
 
@@ -859,6 +988,123 @@ function renderDetail(a) {
       Análisis generado por ${getProviderName()} · 
       <a href="${a.url}" target="_blank" style="color:var(--accent);text-decoration:none">Ver alerta oficial →</a>
     </div>`;
+}
+
+/* ──────────────────────────────────────────────
+   TABLA — vista, filtro, sort, export
+────────────────────────────────────────────── */
+let currentView   = 'detail';
+let sortCol       = -1;
+let sortDir       = 'asc';
+let filteredRows  = [];  // índices visibles
+
+function setView(v) {
+  currentView = v;
+  const isT = v === 'table';
+  document.getElementById('contentPanel').style.display = isT ? 'none' : '';
+  document.getElementById('tablePanel').style.display   = isT ? 'flex' : 'none';
+  document.getElementById('btnDetail').classList.toggle('active', !isT);
+  document.getElementById('btnTable').classList.toggle('active',  isT);
+  if (isT) renderTable();
+}
+
+/* Tipo → clase CSS */
+function tipoClass(tipo) {
+  if (!tipo) return 'tipo-general';
+  const t = tipo.toLowerCase();
+  if (t.includes('falsif')) return 'tipo-falsificados';
+  if (t.includes('calidad') || t.includes('control')) return 'tipo-calidad';
+  if (t.includes('seguridad')) return 'tipo-seguridad';
+  return 'tipo-general';
+}
+
+function renderTable() {
+  const q    = (document.getElementById('tblSearch')?.value || '').toLowerCase();
+  const tbody = document.getElementById('alertsTbody');
+
+  // filtrar
+  let rows = alertas.map((a, i) => ({a, i}));
+  if (q) {
+    rows = rows.filter(({a}) =>
+      (a.titulo||'').toLowerCase().includes(q) ||
+      (a.producto||'').toLowerCase().includes(q) ||
+      (a.tipo||'').toLowerCase().includes(q)
+    );
+  }
+
+  // ordenar
+  if (sortCol >= 0) {
+    const keys = ['titulo','producto','tipo','fecha','url','fecha_captura'];
+    const k = keys[sortCol];
+    rows.sort((x,y) => {
+      const a = (x.a[k]||'').toString();
+      const b = (y.a[k]||'').toString();
+      return sortDir === 'asc' ? a.localeCompare(b) : b.localeCompare(a);
+    });
+  }
+
+  filteredRows = rows.map(r => r.i);
+  document.getElementById('tblCount').textContent = `${rows.length} alertas`;
+
+  tbody.innerHTML = rows.map(({a, i}) => {
+    const num   = a.titulo?.match(/Nº\s*[\d-]+/)?.[0] || '';
+    const titulo = a.titulo?.replace(/ALERTA DIGEMID\s*Nº\s*[\d-]+\s*/i, '') || a.titulo || '—';
+    const fecha  = a.fecha || '—';
+    const captura = a.fecha_captura || '';
+    return `<tr id="trow-${i}" onclick="clickTblRow(${i})" class="${activeIdx===i?'row-selected':''}">
+      <td>
+        <span class="cell-num">${num}</span>
+        <span style="font-size:12px;font-weight:600">${titulo}</span>
+      </td>
+      <td style="max-width:200px">${a.producto||'—'}</td>
+      <td><span class="tipo-badge ${tipoClass(a.tipo)}">${a.tipo||'General'}</span></td>
+      <td class="cell-fecha">${fecha}</td>
+      <td class="cell-url" style="max-width:260px">
+        ${a.url ? `<a href="${a.url}" target="_blank" onclick="event.stopPropagation()">${a.url}</a>` : '—'}
+      </td>
+      <td class="cell-captura">${captura}</td>
+    </tr>`;
+  }).join('');
+
+  // actualizar iconos sort en headers
+  document.querySelectorAll('.alerts-table th').forEach((th, ci) => {
+    th.classList.remove('sort-asc','sort-desc');
+    if (ci === sortCol) th.classList.add(sortDir === 'asc' ? 'sort-asc' : 'sort-desc');
+  });
+}
+
+function filterTable() { if (currentView === 'table') renderTable(); }
+
+function sortTable(col) {
+  if (sortCol === col) {
+    sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+  } else {
+    sortCol = col; sortDir = 'asc';
+  }
+  renderTable();
+}
+
+function clickTblRow(idx) {
+  setView('detail');
+  selectAlerta(idx);
+}
+
+function exportarCSV() {
+  const headers = ['Título','Producto','Tipo de Alerta','Fecha Publicación','URL Alerta','Fecha Captura'];
+  const rows = alertas.map(a => [
+    `"${(a.titulo||'').replace(/"/g,'""')}"`,
+    `"${(a.producto||'').replace(/"/g,'""')}"`,
+    `"${(a.tipo||'').replace(/"/g,'""')}"`,
+    a.fecha||'',
+    `"${(a.url||'').replace(/"/g,'""')}"`,
+    `"${(a.fecha_captura||'').replace(/"/g,'""')}"`
+  ]);
+  const csv = [headers.join(','), ...rows.map(r=>r.join(','))].join('\n');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8'});
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `alertas_digemid_${new Date().toISOString().slice(0,10)}.csv`;
+  link.click();
 }
 
 // Inicializar
